@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 
-pub mod states;
-pub mod instructions;
-pub mod errors;
 pub mod constants;
+pub mod errors;
+pub mod instructions;
+pub mod states;
 
 use crate::instructions::*;
 use crate::states::VoteType;
@@ -22,6 +22,10 @@ pub mod creator_fund {
     pub fn vote_on_post(ctx: Context<VoteOnPost>, vote_type: VoteType) -> Result<()> {
         instructions::vote_on_post(ctx, vote_type)?;
         Ok(())
+    }
+
+    pub fn tip_creator(ctx: Context<TipCreator>, amount: u64) -> Result<()> {
+        instructions::tip_creator_instruction(ctx, amount)
     }
 }
 
