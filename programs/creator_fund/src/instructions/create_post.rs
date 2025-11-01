@@ -28,6 +28,7 @@ pub fn create_post(ctx: Context<CreatePost>, title: String, content: String) -> 
     post.up_votes = 0;
     post.down_votes = 0;
     post.created_at = Clock::get()?.unix_timestamp as u64;
+    post.rewarded = false;
     post.bump = ctx.bumps.post;
 
     Ok(())

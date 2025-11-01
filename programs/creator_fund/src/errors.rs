@@ -13,4 +13,6 @@ pub enum AppError {
     AlreadyVoted,
     #[msg("Vote count overflow")]
     VoteOverflow,
+    #[msg("Invalid creator for this post")]
+    InvalidCreator,
 }
