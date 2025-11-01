@@ -9,4 +9,8 @@ pub enum AppError {
     PostContentRequired,
     #[msg("Post content is too long")]
     PostContentTooLong,
+    #[msg("Already voted on this post")]
+    AlreadyVoted,
+    #[msg("Vote count overflow")]
+    VoteOverflow,
 }

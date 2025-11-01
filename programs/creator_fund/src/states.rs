@@ -21,3 +21,12 @@ pub struct Post {
     pub created_at: u64,
     pub bump: u8,
 }
+
+#[account]
+#[derive(InitSpace)]
+pub struct Vote {
+    pub voter: Pubkey,
+    pub post: Pubkey,
+    pub vote_type: VoteType,
+    pub bump: u8,
+}

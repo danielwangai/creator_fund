@@ -6,3 +6,4 @@ pub const POST_TITLE_MAX_LEN: usize = 100;
 pub const POST_CONTENT_MAX_LEN: usize = 280;
 
 pub const POST_SEED: &str = "post";
+pub const VOTE_SEED: &str = "vote";
