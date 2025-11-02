@@ -19,12 +19,21 @@ pub mod creator_fund {
         Ok(())
     }
 
-    pub fn vote_on_post(ctx: Context<VoteOnPost>, vote_type: VoteType) -> Result<()> {
-        instructions::vote_on_post(ctx, vote_type)?;
+    pub fn upvote_on_post(ctx: Context<VoteOnPost>) -> Result<()> {
+        instructions::vote_on_post(ctx, VoteType::UpVote)?;
+        Ok(())
+    }
+
+    pub fn downvote_on_post(ctx: Context<VoteOnPost>) -> Result<()> {
+        instructions::vote_on_post(ctx, VoteType::DownVote)?;
         Ok(())
     }
 
     pub fn tip_creator(ctx: Context<TipCreator>, amount: u64) -> Result<()> {
         instructions::tip_creator_instruction(ctx, amount)
+    }
+
+    pub fn claim_creator_reward(ctx: Context<ClaimCreatorReward>) -> Result<()> {
+        instructions::claim_creator_reward(ctx)
     }
 }
