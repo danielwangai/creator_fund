@@ -472,6 +472,183 @@ describe("creator_fund", () => {
     });
   });
 
+  describe("tip creator", () => {
+    let mint: PublicKey;
+    let tipper: anchor.web3.Keypair;
+    let creator: anchor.web3.Keypair;
+    let tipperTokenAccount: PublicKey;
+    let creatorTokenAccount: PublicKey;
+    let deployer: anchor.web3.Keypair;
+    let creatorPostPDA: anchor.web3.PublicKey;
+
+    before(async () => {
+      // Setup accounts
+      tipper = anchor.web3.Keypair.generate();
+      creator = anchor.web3.Keypair.generate();
+      deployer = anchor.web3.Keypair.generate();
+      
+      await airdrop(tipper.publicKey);
+      await airdrop(creator.publicKey);
+      await airdrop(deployer.publicKey);
+
+      // Create a post for the creator (required for tipping)
+      const creatorPostTitle = "Creator Post " + Date.now().toString();
+      [creatorPostPDA] = getPostAddress(
+        creator.publicKey,
+        creatorPostTitle,
+        program.programId,
+      );
+      
+      await program.methods
+        .createPost(creatorPostTitle, "This creator can be tipped")
+        .accounts({
+          author: creator.publicKey,
+          post: creatorPostPDA,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([creator])
+        .rpc();
+
+      // Create token mint
+      mint = await createMint(
+        program.provider.connection,
+        deployer,
+        deployer.publicKey, // mint authority
+        null,
+        9 // decimals
+      );
+
+      // Create token accounts
+      tipperTokenAccount = await createAccount(
+        program.provider.connection,
+        deployer,
+        mint,
+        tipper.publicKey
+      );
+
+      creatorTokenAccount = await createAccount(
+        program.provider.connection,
+        deployer,
+        mint,
+        creator.publicKey
+      );
+
+      // Mint tokens to tipper's account
+      await mintTo(
+        program.provider.connection,
+        deployer,
+        mint,
+        tipperTokenAccount,
+        deployer, // mint authority
+        1000_000_000 // 1000 tokens (with 9 decimals)
+      );
+    });
+
+    it("can tip creator with at least 1 post", async () => {
+      const tipAmount = 100_000_000; // 0.1 tokens
+      
+      // Get balances before
+      const tipperBalanceBefore = await getAccount(program.provider.connection, tipperTokenAccount);
+      const creatorBalanceBefore = await getAccount(program.provider.connection, creatorTokenAccount);
+
+      // Tip creator
+      await program.methods
+        .tipCreator(new anchor.BN(tipAmount))
+        .accounts({
+          from: tipperTokenAccount,
+          to: creatorTokenAccount,
+          mint: mint,
+          authority: tipper.publicKey,
+          creatorPost: creatorPostPDA,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .signers([tipper])
+        .rpc();
+
+      // Verify balances after
+      const tipperBalanceAfter = await getAccount(program.provider.connection, tipperTokenAccount);
+      const creatorBalanceAfter = await getAccount(program.provider.connection, creatorTokenAccount);
+
+      // Verify tipper balance decreased
+      assert.equal(
+        tipperBalanceBefore.amount - tipperBalanceAfter.amount,
+        BigInt(tipAmount)
+      );
+
+      // Verify creator balance increased
+      assert.equal(
+        creatorBalanceAfter.amount - creatorBalanceBefore.amount,
+        BigInt(tipAmount)
+      );
+    });
+
+    it("cannot tip creator without any post", async () => {
+      // Create a creator with no posts
+      const newCreator = anchor.web3.Keypair.generate();
+      await airdrop(newCreator.publicKey);
+      
+      const newCreatorTokenAccount = await createAccount(
+        program.provider.connection,
+        deployer,
+        mint,
+        newCreator.publicKey
+      );
+
+      try {
+        await program.methods
+          .tipCreator(new anchor.BN(100_000_000))
+          .accounts({
+            from: tipperTokenAccount,
+            to: newCreatorTokenAccount,
+            mint: mint,
+            authority: tipper.publicKey,
+            creatorPost: creatorPostPDA, // This post belongs to different creator
+            tokenProgram: TOKEN_PROGRAM_ID,
+          })
+          .signers([tipper])
+          .rpc();
+        assert.fail("Expected transaction to fail - creator has no posts");
+      } catch (error) {
+        // Should fail because the post doesn't belong to the creator
+        const errorStr = error.toString();
+        assert.ok(
+          errorStr.includes("CreatorHasNoPosts") ||
+          errorStr.includes("Creator must have at least 1 post") ||
+          errorStr.includes("6007"),
+          `Expected CreatorHasNoPosts error, got: ${errorStr}`
+        );
+      }
+    });
+
+    it("cannot tip with insufficient balance", async () => {
+      const largeTipAmount = 10_000_000_000; // 10 tokens (more than tipper has)
+      
+      try {
+        await program.methods
+          .tipCreator(new anchor.BN(largeTipAmount))
+          .accounts({
+            from: tipperTokenAccount,
+            to: creatorTokenAccount,
+            mint: mint,
+            authority: tipper.publicKey,
+            creatorPost: creatorPostPDA,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          })
+          .signers([tipper])
+          .rpc();
+        assert.fail("Expected transaction to fail due to insufficient balance");
+      } catch (error) {
+        // Should fail with insufficient funds error
+        assert.ok(
+          error.toString().includes("insufficient") ||
+          error.toString().includes("InsufficientFunds") ||
+          error.toString().includes("0x1"),
+          `Expected insufficient funds error, got: ${error.toString()}`
+        );
+      }
+    });
+  });
+
   // Helper functions
   const airdrop = async (publicKey: anchor.web3.PublicKey) => {
     const sig = await program.provider.connection.requestAirdrop(

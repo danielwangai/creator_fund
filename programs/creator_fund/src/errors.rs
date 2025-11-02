@@ -15,4 +15,6 @@ pub enum AppError {
     VoteOverflow,
     #[msg("Invalid creator for this post")]
     InvalidCreator,
+    #[msg("Creator must have at least 1 post to receive tips")]
+    CreatorHasNoPosts,
 }
