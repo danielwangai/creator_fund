@@ -28,6 +28,3 @@ pub mod creator_fund {
         instructions::tip_creator_instruction(ctx, amount)
     }
 }
-
-#[derive(Accounts)]
-pub struct Initialize {}
