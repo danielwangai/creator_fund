@@ -17,6 +17,7 @@ describe("creator_fund", () => {
 
   // authors/actors
   const bob = anchor.web3.Keypair.generate();
+  const alice = anchor.web3.Keypair.generate();
 
   const program = anchor.workspace.creatorFund as Program<CreatorFund>;
 
@@ -28,6 +29,7 @@ describe("creator_fund", () => {
 
   before(async () => {
     await airdrop(bob.publicKey);
+    await airdrop(alice.publicKey);
     // create post
     postTitle1 = postTitle1 + Date.now().toString();
     [postPDA1] = getPostAddress(
@@ -187,6 +189,64 @@ describe("creator_fund", () => {
     });
   });
 
+  describe("vote on post", () => {
+    it("can upvote on a post", async () => {
+      var bobsPost = await program.account.post.fetch(postPDA1);
+      const upvotesBefore = bobsPost.upVotes;
+      // alice votes up on post
+      await program.methods
+        .upvoteOnPost()
+        .accounts({
+          voter: alice.publicKey,
+          post: postPDA1,
+        })
+        .signers([alice])
+        .rpc();
+
+        bobsPost = await program.account.post.fetch(postPDA1);
+        const upvotesAfter = bobsPost.upVotes;
+        assert.equal(upvotesAfter.toNumber(), upvotesBefore.toNumber() + 1);
+    });
+    
+    it("cannot vote twice", async () => {
+      // alice tries to vote again on the same post
+      try {
+        await program.methods
+          .upvoteOnPost()
+          .accounts({
+            voter: alice.publicKey,
+            post: postPDA1,
+          })
+          .signers([alice])
+          .rpc();
+        assert.fail("Expected transaction to fail");
+      } catch (error) {
+        assert.ok(error.toString().includes("already in use"));
+      }
+    });
+    
+    it("can downvote on a post", async () => {
+      // Use a fresh voter for downvote to avoid conflicts
+      const freshVoter = anchor.web3.Keypair.generate();
+      await airdrop(freshVoter.publicKey);
+      
+      var bobsPost = await program.account.post.fetch(postPDA1);
+      const downvotesBefore = bobsPost.downVotes;
+      // fresh voter votes down on post
+      await program.methods
+        .downvoteOnPost()
+        .accounts({
+          voter: freshVoter.publicKey,
+          post: postPDA1,
+        })
+        .signers([freshVoter])
+        .rpc();
+
+        bobsPost = await program.account.post.fetch(postPDA1);
+        const downvotesAfter = bobsPost.downVotes;
+        assert.equal(downvotesAfter.toNumber(), downvotesBefore.toNumber() + 1);
+    });
+  });
 
   // Helper functions
   const airdrop = async (publicKey: anchor.web3.PublicKey) => {
